@@ -26,14 +26,13 @@ export const signup = async (req, res) => {
       password: hashedPassword,
     });
     if (newUser) {
-      //generate jwt token
-      generteJwtToken(newUser._id, res);
       await newUser.save();
+      generteJwtToken(newUser._id, res);
       res.status(201).json({
-        _id: user._id,
-        fullName: user.fullName,
-        email: user.email,
-        profilePicture: user.profilePicture,
+        // _id: newUser._id,
+        fullName: newUser.fullName,
+        email: newUser.email,
+        profilePicture: newUser.profilePicture,
       });
     } else {
       res.status(400).json({ message: "Invalid Data" });
@@ -101,3 +100,11 @@ export const updateProfile = async (req, res) => {
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
+
+export const checkAuth =async(req,res)=>{
+  try {
+    res.status(200).json(req.user);
+  } catch (error) {
+     res.status(500).json({ message: "Internal Server Error" });
+  }
+}
