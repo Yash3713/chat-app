@@ -1,77 +1,121 @@
 import { create } from "zustand";
-import { axiosInstance } from "../axios";
-import toast from "react-hot-toast";
-import type { AuthUser, LogInFormData, SignUpFormData } from "../types";
-import axios from "axios";
+import type {
+  AuthError,
+  AuthUser,
+  LogInFormData,
+  SignUpFormData,
+} from "../types/api/auth";
+import { devtools } from "zustand/middleware";
+import { authApi } from "../api/auth.api";
+import { getErrorMessage } from "../utils";
 
-interface AuthStore {
+// State
+interface AuthState {
   authUser: AuthUser | null;
   isCheckingAuth: boolean;
   isSigningUp: boolean;
-  isLoggingIn:boolean;
+  isLoggingIn: boolean;
+  isLoggingOut: boolean;
+  error: AuthError;
+}
+//Actions
+interface AuthAction {
   checkAuth: () => Promise<void>;
-  signUp: (data: SignUpFormData) => Promise<void>;
-  logOut: ()=> Promise<void>;
-  logIn:(data:LogInFormData)=> Promise<void>
+  signUp: (
+    data: SignUpFormData,
+  ) => Promise<{ success: boolean; error?: string }>;
+  logIn: (data: LogInFormData) => Promise<{ success: boolean; error?: string }>;
+  logOut: () => Promise<{ success: boolean; error?: string }>;
+  clearError: () => void;
+  reset: () => void;
 }
 
-export const useAuthStore = create<AuthStore>((set) => ({
+type AuthStore = AuthState & AuthAction;
+
+const initialState: AuthState = {
   authUser: null,
   isCheckingAuth: true,
   isSigningUp: false,
-  isLoggingIn:false,
+  isLoggingIn: false,
+  isLoggingOut: false,
+  error: null,
+};
 
-  checkAuth: async () => {
-    try {
-      const res = await axiosInstance.get<AuthUser>("auth/check");
-      set({ authUser: res.data });
-    } catch (error) {
-      console.log(error);
-      set({ authUser: null });
-    } finally {
-      set({ isCheckingAuth: false });
-    }
-  },
+export const useAuthStore = create<AuthStore>()(
+  devtools(
+    (set) => ({
+      ...initialState,
 
-  signUp: async (data: SignUpFormData) => {
-    set({ isSigningUp: true });
-    try {
-      const res = await axiosInstance.post<AuthUser>("auth/signup", data);
-      set({ authUser: res.data });
-      toast.success("Account Created Succesfully !!");
-    } catch (error) {
-      const message = axios.isAxiosError(error)
-        ? error.response?.data?.message ?? "Something went wrong"
-        : "Something went wrong";
-      toast.error(message);
-    } finally {
-      set({ isSigningUp: false });
-    }
-  },
-  logOut: async()=>{
-    try {
-      await axiosInstance.post("/auth/logout")
-      set({authUser:null})
-      toast.success("Logged Oiut Succesfully")
-    } catch (error) {
-       const message = axios.isAxiosError(error)
-        ? error.response?.data?.message ?? "Something went wrong"
-        : "Something went wrong";
-      toast.error(message);
-    }
-  },
-  logIn: async(data)=>{
-    set({isLoggingIn:true})
-    try {
-      const res = await axiosInstance.post("/auth/login",data)
-      set({authUser:res.data})
-      toast.success("Logged In Succesfully")
-    } catch (error) {const message = axios.isAxiosError(error)
-        ? error.response?.data?.message ?? "Something went wrong"
-        : "Something went wrong";
-      toast.error(message);
-    }finally{
-      set({isLoggingIn:false})
-    }
-  }
-}));
+      // Auth check on app load
+      checkAuth: async () => {
+        try {
+          const res = await authApi.checkAuth();
+          set({ authUser: res.data }, false, "checkAuth/success");
+        } catch {
+          set({ authUser: null }, false, "checkAuth/failure");
+        } finally {
+          set({ isCheckingAuth: false }, false, "checkAuth/done");
+        }
+      },
+
+      signUp: async (data) => {
+        set({ isSigningUp: true, error: null }, false, "signUp/start");
+        try {
+          const res = await authApi.signUp(data);
+          set({ authUser: res.data }, false, "signUp/success");
+          return { success: true };
+        } catch (error) {
+          const message = getErrorMessage(error);
+          set({ error: message }, false, "signUp/failure");
+          return { success: false, error: message };
+        } finally {
+          set({ isSigningUp: false }, false, "signUp/done");
+        }
+      },
+
+      logIn: async (data) => {
+        set({ isLoggingIn: true, error: null }, false, "logIn/start");
+        try {
+          const res = await authApi.logIn(data);
+          set({ authUser: res.data }, false, "logIn/success");
+          return { success: true };
+        } catch (error) {
+          const message = getErrorMessage(error);
+          set({ error: message }, false, "logIn/failure");
+          return { success: false, error: message };
+        } finally {
+          set({ isLoggingIn: false }, false, "logIn/done");
+        }
+      },
+
+      logOut: async () => {
+        set({ isLoggingOut: true, error: null }, false, "logOut/start");
+        try {
+          await authApi.logOut();
+          set({ authUser: null }, false, "logOut/success");
+          return { success: true };
+        } catch (error) {
+          const message = getErrorMessage(error);
+          set({ error: message }, false, "logOut/failure");
+          return { success: false, error: message };
+        } finally {
+          set({ isLoggingOut: false }, false, "logOut/done");
+        }
+      },
+
+      clearError: () => set({ error: null }, false, "clearError"),
+
+      // wipe entire auth state
+      reset: () => set(initialState, false, "reset"),
+    }),
+    { name: "AuthStore" },
+  ),
+);
+
+// Selector Hooks
+export const useAuthUser = () => useAuthStore((s) => s.authUser);
+export const useAuthError = () => useAuthStore((s) => s.error);
+export const useIsCheckingAuth = () => useAuthStore((s) => s.isCheckingAuth);
+export const useIsLoggingIn = () => useAuthStore((s) => s.isLoggingIn);
+export const useIsSigningUp = () => useAuthStore((s) => s.isSigningUp);
+export const useIsLoggingOut = () => useAuthStore((s) => s.isLoggingOut);

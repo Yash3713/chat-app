@@ -1,4 +1,4 @@
-import type { AuthImagePatternProps } from "../types";
+import type { AuthImagePatternProps } from "../types/types";
 
 const AuthImagePattern = ({ title, subtitle }: AuthImagePatternProps) => {
   return (

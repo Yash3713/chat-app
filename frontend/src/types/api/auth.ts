@@ -1,13 +1,9 @@
 export interface AuthUser {
   _id: string;
-  email: string;
   fullName: string;
-  profilePicture: string;
-}
-
-export interface AuthImagePatternProps {
-  title: string;
-  subtitle: string;
+  email: string;
+  profilePic: string;
+  createdAt: string;
 }
 
 export interface SignUpFormData {
@@ -15,7 +11,10 @@ export interface SignUpFormData {
   email: string;
   password: string;
 }
+
 export interface LogInFormData {
   email: string;
   password: string;
 }
+
+export type AuthError = string | null;

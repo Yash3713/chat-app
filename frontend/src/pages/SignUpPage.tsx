@@ -1,51 +1,79 @@
-import { useState } from "react";
-import { useAuthStore } from "../store/useAuthStore";
+/* eslint-disable react-hooks/exhaustive-deps */
+import { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Loader2, Lock, Mail, MessageSquare, User } from "lucide-react";
-import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
+import { useAuthStore, useIsSigningUp, useAuthError } from "../store/useAuthStore";
 import AuthImagePattern from "../components/AuthImagePattern";
-import type { SignUpFormData } from "../types";
+import type { SignUpFormData } from "../types/api/auth";
+
+const initialFormData: SignUpFormData = {
+  fullName: "",
+  email: "",
+  password: "",
+};
+
+
+const validateForm = (data: SignUpFormData): string | null => {
+  if (!data.fullName.trim()) return "Full name is required";
+  if (!data.email.trim()) return "Email is required";
+  if (!/\S+@\S+\.\S+/.test(data.email)) return "Invalid email format";
+  if (!data.password) return "Password is required";
+  if (data.password.length < 8) return "Password must be at least 8 characters";
+  return null; 
+};
 
 const SignUpPage = () => {
   const [showPassword, setShowPassword] = useState(false);
-  const [formData, setFormData] = useState<SignUpFormData>({
-    fullName: "",
-    email: "",
-    password: "",
-  });
+  const [formData, setFormData] = useState<SignUpFormData>(initialFormData);
 
-  const { signUp, isSigningUp } = useAuthStore();
+  const signUp = useAuthStore((s) => s.signUp);
+  const clearError = useAuthStore((s) => s.clearError);
+  const isSigningUp = useIsSigningUp();
+  const error = useAuthError();
 
-  const validateForm = () => {
-    if (!formData.fullName.trim()) return toast.error("Full name is required");
-    if (!formData.email.trim()) return toast.error("Email is required");
-    if (!/\S+@\S+\.\S+/.test(formData.email)) return toast.error("Invalid email format");
-    if (!formData.password) return toast.error("Password is required");
-    if (formData.password.length < 8) return toast.error("Password must be at least 8 characters");
+  const navigate = useNavigate();
 
-    return true;
+  // Clear store error when user edits form
+  useEffect(() => {
+    if (error) clearError();
+  }, [formData]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  const handleSubmit = (e: React.SyntheticEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    const success = validateForm();
+    // Client-side validation fires toast and bails early
+    const validationError = validateForm(formData);
+    if (validationError) {
+      toast.error(validationError);
+      return;
+    }
 
-    if (success === true) signUp(formData);
+    const result = await signUp(formData);
+
+    if (result.success) {
+      toast.success("Account created successfully!");
+      navigate("/");
+    } else {
+      toast.error(result.error ?? "Sign up failed");
+    }
   };
 
   return (
     <div className="min-h-screen grid lg:grid-cols-2">
-      {/* left side */}
+
+      {/* ── Left: Form ─────────────────────────────── */}
       <div className="flex flex-col justify-center items-center p-6 sm:p-12">
         <div className="w-full max-w-md space-y-8">
-          {/* LOGO */}
+
+          {/* Logo */}
           <div className="text-center mb-8">
             <div className="flex flex-col items-center gap-2 group">
-              <div
-                className="size-12 rounded-xl bg-primary/10 flex items-center justify-center 
-              group-hover:bg-primary/20 transition-colors"
-              >
+              <div className="size-12 rounded-xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
                 <MessageSquare className="size-6 text-primary" />
               </div>
               <h1 className="text-2xl font-bold mt-2">Create Account</h1>
@@ -53,9 +81,18 @@ const SignUpPage = () => {
             </div>
           </div>
 
+          {/* Inline error banner */}
+          {error && (
+            <div role="alert" className="alert alert-error text-sm py-2 px-4">
+              <span>{error}</span>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-6">
+
+            {/* Full Name */}
             <div className="form-control">
-              <label className="label">
+              <label htmlFor="fullName" className="label">
                 <span className="label-text font-medium">Full Name</span>
               </label>
               <div className="relative">
@@ -63,17 +100,22 @@ const SignUpPage = () => {
                   <User className="size-5 text-base-content/40" />
                 </div>
                 <input
+                  id="fullName"
+                  name="fullName"
                   type="text"
-                  className={`input input-bordered w-full pl-10`}
+                  autoComplete="name"
                   placeholder="John Doe"
+                  className="input input-bordered w-full pl-10"
                   value={formData.fullName}
-                  onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                  onChange={handleChange}
+                  disabled={isSigningUp}
                 />
               </div>
             </div>
 
+            {/* Email */}
             <div className="form-control">
-              <label className="label">
+              <label htmlFor="email" className="label">
                 <span className="label-text font-medium">Email</span>
               </label>
               <div className="relative">
@@ -81,17 +123,22 @@ const SignUpPage = () => {
                   <Mail className="size-5 text-base-content/40" />
                 </div>
                 <input
+                  id="email"
+                  name="email"
                   type="email"
-                  className={`input input-bordered w-full pl-10`}
+                  autoComplete="email"
                   placeholder="you@example.com"
+                  className="input input-bordered w-full pl-10"
                   value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  onChange={handleChange}
+                  disabled={isSigningUp}
                 />
               </div>
             </div>
 
+            {/* Password */}
             <div className="form-control">
-              <label className="label">
+              <label htmlFor="password" className="label">
                 <span className="label-text font-medium">Password</span>
               </label>
               <div className="relative">
@@ -99,31 +146,39 @@ const SignUpPage = () => {
                   <Lock className="size-5 text-base-content/40" />
                 </div>
                 <input
+                  id="password"
+                  name="password"
                   type={showPassword ? "text" : "password"}
-                  className={`input input-bordered w-full pl-10`}
+                  autoComplete="new-password"
                   placeholder="••••••••"
+                  className="input input-bordered w-full pl-10"
                   value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  onChange={handleChange}
+                  disabled={isSigningUp}
                 />
                 <button
                   type="button"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                   className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                  onClick={() => setShowPassword(!showPassword)}
+                  onClick={() => setShowPassword((prev) => !prev)}
                 >
-                  {showPassword ? (
-                    <EyeOff className="size-5 text-base-content/40" />
-                  ) : (
-                    <Eye className="size-5 text-base-content/40" />
-                  )}
+                  {showPassword
+                    ? <EyeOff className="size-5 text-base-content/40" />
+                    : <Eye className="size-5 text-base-content/40" />}
                 </button>
               </div>
             </div>
 
-            <button type="submit" className="btn btn-primary w-full" disabled={isSigningUp}>
+            {/* Submit */}
+            <button
+              type="submit"
+              className="btn btn-primary w-full"
+              disabled={isSigningUp}
+            >
               {isSigningUp ? (
                 <>
                   <Loader2 className="size-5 animate-spin" />
-                  Loading...
+                  Creating account...
                 </>
               ) : (
                 "Create Account"
@@ -139,11 +194,11 @@ const SignUpPage = () => {
               </Link>
             </p>
           </div>
+
         </div>
       </div>
 
-      {/* right side */}
-
+      {/* ── Right: Pattern ──────────────────────────── */}
       <AuthImagePattern
         title="Join our community"
         subtitle="Connect with friends, share moments, and stay in touch with your loved ones."
@@ -151,4 +206,5 @@ const SignUpPage = () => {
     </div>
   );
 };
+
 export default SignUpPage;
