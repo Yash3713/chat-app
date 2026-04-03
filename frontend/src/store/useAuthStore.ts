@@ -4,6 +4,7 @@ import type {
   AuthUser,
   LogInFormData,
   SignUpFormData,
+  UpdateProfileData,
 } from "../types/api/auth";
 import { devtools } from "zustand/middleware";
 import { authApi } from "../api/auth.api";
@@ -16,6 +17,7 @@ interface AuthState {
   isSigningUp: boolean;
   isLoggingIn: boolean;
   isLoggingOut: boolean;
+  isUpdatingProfile:boolean;
   error: AuthError;
 }
 //Actions
@@ -26,6 +28,7 @@ interface AuthAction {
   ) => Promise<{ success: boolean; error?: string }>;
   logIn: (data: LogInFormData) => Promise<{ success: boolean; error?: string }>;
   logOut: () => Promise<{ success: boolean; error?: string }>;
+  updateProfile: (data: UpdateProfileData) => Promise<{ success: boolean; error?: string }>
   clearError: () => void;
   reset: () => void;
 }
@@ -38,6 +41,7 @@ const initialState: AuthState = {
   isSigningUp: false,
   isLoggingIn: false,
   isLoggingOut: false,
+  isUpdatingProfile:false,
   error: null,
 };
 
@@ -103,6 +107,21 @@ export const useAuthStore = create<AuthStore>()(
         }
       },
 
+      updateProfile: async (data) => {
+        set({ isUpdatingProfile: true, error: null }, false, "updateProfile/start");
+        try {
+          const res = await authApi.updateProfile(data);
+          set({ authUser: res.data }, false, "updateProfile/success");
+          return { success: true };
+        } catch (error) {
+          const message = getErrorMessage(error);
+          set({ error: message }, false, "updateProfile/failure");
+          return { success: false, error: message };
+        } finally {
+          set({ isUpdatingProfile: false }, false, "updateProfile/done");
+        }
+      },
+
       clearError: () => set({ error: null }, false, "clearError"),
 
       // wipe entire auth state
@@ -119,3 +138,4 @@ export const useIsCheckingAuth = () => useAuthStore((s) => s.isCheckingAuth);
 export const useIsLoggingIn = () => useAuthStore((s) => s.isLoggingIn);
 export const useIsSigningUp = () => useAuthStore((s) => s.isSigningUp);
 export const useIsLoggingOut = () => useAuthStore((s) => s.isLoggingOut);
+export const useIsUpdatingProfile =()=> useAuthStore((s)=>s.isUpdatingProfile)

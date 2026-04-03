@@ -1,5 +1,5 @@
 import { axiosInstance } from "../axios";
-import type { AuthUser, LogInFormData, SignUpFormData } from "../types/api/auth";
+import type { AuthUser, LogInFormData, SignUpFormData, UpdateProfileData } from "../types/api/auth";
 
 
 export const authApi = {
@@ -14,4 +14,7 @@ export const authApi = {
 
   logOut: () =>
     axiosInstance.post("auth/logout"),
+
+  updateProfile: (data: UpdateProfileData) =>
+    axiosInstance.post<AuthUser>("auth/update-profile", data),
 };
